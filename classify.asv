@@ -1,54 +1,51 @@
-% Load and prepare your image dataset
+% Load image datastore and initialize training/validation sets
 pathToImages = imageDatastore('./', 'IncludeSubfolders', true, 'LabelSource', 'foldernames');
 [trainingSet, validationSet] = splitEachLabel(pathToImages, 0.8, 'randomized');
 
-targetSize = [100 100];
+targetSize = [256 256];
 
-% Extract features from our image dataset
-features = {'Area', 'Perimeter', 'Eccentricity', 'ConvexArea', 'Solidity', 'EulerNumber'};
-textureFeatures = {'Contrast', 'Correlation', 'Energy', 'Homogeneity'};
-
-trainingFeatures = zeros(length(trainingSet.Files), length(features) + length(textureFeatures));
+% features from our image dataset
+features = {'Mean', 'Std', 'Skew', 'Kurtosis', 'MeanR', 'MeanG', 'MeanB', 'StdR', 'StdG', 'StdB', 'SkewR', 'SkewG', 'SkewB', 'KurtosisR', 'KurtosisG', 'KurtosisB'};
+trainingFeatures = zeros(length(trainingSet.Files), length(features));
 for i = 1:length(trainingSet.Files)
     img = imread(trainingSet.Files{i});
 
     img = imresize(img,targetSize);
-    
-    % Compute the texture features of the image using the Gray-Level Co-Occurrence Matrix (GLCM)
-    gray = rgb2gray(img);
-    offsets = [0 1; -1 1; -1 0; -1 -1];
-    glcm = graycomatrix(gray, 'Offset', offsets);
-    statsTexture = graycoprops(glcm, textureFeatures);
-    
-    % Compute the geometric features of the image
-    mask = gray2ind(gray);
-    statsGeometric = regionprops('table', mask, features);
-    
-    % Combine the texture and geometric features into a single feature vector
-trainingFeatures(i,:) = [mean(statsGeometric{:,:}, 'omitnan') mean(structfun(@mean, statsTexture{:,:}))];
+
+    % Extract statistical features from the image
+    gray_img = rgb2gray(img);
+    color_img = double(img);
+    color_img = color_img ./ 255;
+    red = color_img(:, :, 1);
+    green = color_img(:, :, 2);
+    blue = color_img(:, :, 3);
+    stats_gray = [mean2(gray_img), std2(gray_img), skewness(gray_img(:)), kurtosis(gray_img(:))];
+    stats_color = [mean2(red), mean2(green), mean2(blue), std2(red), std2(green), std2(blue), skewness(red(:)), skewness(green(:)), skewness(blue(:)), kurtosis(red(:)), kurtosis(green(:)), kurtosis(blue(:))];
+    trainingFeatures(i,:) = [stats_gray stats_color];
 end
+
 trainingLabels = trainingSet.Labels;
 
 % Train our classifier
 ourClassifier = fitcecoc(trainingFeatures, trainingLabels);
 
-% Evaluate our classifier
-validationFeatures = zeros(length(validationSet.Files), length(features) + length(textureFeatures));
+% Evaluate our classifier for accuracy
+validationFeatures = zeros(length(validationSet.Files), length(features));
 for i = 1:length(validationSet.Files)
    img = imread(validationSet.Files{i});
-    
-    % Compute the texture features of the image using the Gray-Level Co-Occurrence Matrix (GLCM)
-    gray = rgb2gray(img);
-    offsets = [0 1; -1 1; -1 0; -1 -1];
-    glcm = graycomatrix(gray, 'Offset', offsets);
-    statsTexture = graycoprops(glcm, textureFeatures);
-    
-    % Compute the geometric features of the image
-    mask = gray2ind(gray);
-    statsGeometric = regionprops('table', mask, features);
-    
-    % Combine the texture and geometric features into a single feature vector
-    validationFeatures(i,:) = [mean(statsGeometric{:,:}, 'omitnan') mean(struct2table(statsTexture))];
+
+   img = imresize(img,targetSize);
+
+   % Extract statistical features from the image
+   gray_img = rgb2gray(img);
+   color_img = double(img);
+   color_img = color_img ./ 255;
+   red = color_img(:, :, 1);
+   green = color_img(:, :, 2);
+   blue = color_img(:, :, 3);
+   stats_gray = [mean2(gray_img), std2(gray_img), skewness(gray_img(:)), kurtosis(gray_img(:))];
+   stats_color = [mean2(red), mean2(green), mean2(blue), std2(red), std2(green), std2(blue), skewness(red(:)), skewness(green(:)), skewness(blue(:)), kurtosis(red(:)), kurtosis(green(:)), kurtosis(blue(:))];
+   validationFeatures(i,:) = [stats_gray stats_color];
 end
 validationLabels = validationSet.Labels;
 predictedLabels = predict(ourClassifier, validationFeatures);

@@ -2,37 +2,50 @@
 pathToImages = imageDatastore('./', 'IncludeSubfolders', true, 'LabelSource', 'foldernames');
 [trainingSet, validationSet] = splitEachLabel(pathToImages, 0.8, 'randomized');
 
-targetSize = [100 100];
+targetSize = [256 256];
 
-% Extract features from our image dataset
-features = {'Area', 'Perimeter', 'Eccentricity', 'ConvexArea', 'Solidity', 'EulerNumber'};
+%features to extract from our image dataset
+features = {'Mean', 'Std', 'Skew', 'Kurtosis', 'MeanR', 'MeanG', 'MeanB', 'StdR', 'StdG', 'StdB', 'SkewR', 'SkewG', 'SkewB', 'KurtosisR', 'KurtosisG', 'KurtosisB'};
 trainingFeatures = zeros(length(trainingSet.Files), length(features));
 for i = 1:length(trainingSet.Files)
     img = imread(trainingSet.Files{i});
 
     img = imresize(img,targetSize);
 
-    % Do feature extraction here
-    
-    stats = regionprops('table',mask, features);
-    trainingFeatures(i,:) = mean(stats{:,:}, 'omitnan');
+    % Extract statistical features from the image
+    gray_img = rgb2gray(img);
+    color_img = double(img);
+    color_img = color_img ./ 255;
+    red = color_img(:, :, 1);
+    green = color_img(:, :, 2);
+    blue = color_img(:, :, 3);
+    stats_gray = [mean2(gray_img), std2(gray_img), skewness(gray_img(:)), kurtosis(gray_img(:))];
+    stats_color = [mean2(red), mean2(green), mean2(blue), std2(red), std2(green), std2(blue), skewness(red(:)), skewness(green(:)), skewness(blue(:)), kurtosis(red(:)), kurtosis(green(:)), kurtosis(blue(:))];
+    trainingFeatures(i,:) = [stats_gray stats_color];
 end
+
 trainingLabels = trainingSet.Labels;
 
 % Train our classifier
 ourClassifier = fitcecoc(trainingFeatures, trainingLabels);
 
-% Evaluate our classifier
+% Evaluate our classifier for accuracy.
 validationFeatures = zeros(length(validationSet.Files), length(features));
 for i = 1:length(validationSet.Files)
    img = imread(validationSet.Files{i});
 
    img = imresize(img,targetSize);
 
-    % Do feature extraction here
-    
-   stats = regionprops('table',mask, features);
-   validationFeatures(i,:) = mean(stats{:,:}, 'omitnan');
+   % Extract statistical features from the image
+   gray_img = rgb2gray(img);
+   color_img = double(img);
+   color_img = color_img ./ 255;
+   red = color_img(:, :, 1);
+   green = color_img(:, :, 2);
+   blue = color_img(:, :, 3);
+   stats_gray = [mean2(gray_img), std2(gray_img), skewness(gray_img(:)), kurtosis(gray_img(:))];
+   stats_color = [mean2(red), mean2(green), mean2(blue), std2(red), std2(green), std2(blue), skewness(red(:)), skewness(green(:)), skewness(blue(:)), kurtosis(red(:)), kurtosis(green(:)), kurtosis(blue(:))];
+   validationFeatures(i,:) = [stats_gray stats_color];
 end
 validationLabels = validationSet.Labels;
 predictedLabels = predict(ourClassifier, validationFeatures);
