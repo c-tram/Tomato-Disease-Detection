@@ -51,5 +51,20 @@ validationLabels = validationSet.Labels;
 predictedLabels = predict(ourClassifier, validationFeatures);
 accuracy = mean(predictedLabels == validationLabels);
 
+% Calculate confusion matrix
+confusionMatrix = confusionmat(validationLabels, predictedLabels);
+truePositives = confusionMatrix(1, 1);
+falsePositives = confusionMatrix(2, 1);
+falseNegatives = confusionMatrix(1, 2);
+
+% Calculate precision, recall, and F1 score
+precision = truePositives / (truePositives + falsePositives);
+recall = truePositives / (truePositives + falseNegatives);
+f1Score = 2 * (precision * recall) / (precision + recall);
+
+% Display F1 score
+fprintf('F1 Score: %.4f\n', f1Score);
+
+
 % Save classifier
 save('Classifier.mat', 'ourClassifier');
